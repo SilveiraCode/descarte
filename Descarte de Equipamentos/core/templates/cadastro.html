@@ -1,0 +1,47 @@
+{% extends 'index.html' %}
+
+{% block main %}
+<div class="container d-flex justify-content-center align-items-center" style="min-height: 80vh;">
+    <div class="card shadow border-0" style="width: 450px; border-radius: 15px;">
+        <div class="card-body p-5">
+            <h3 class="text-center fw-bold mb-4 text-success">Criar Conta</h3>
+            
+            <form method="post">
+                {% csrf_token %}
+                {% for field in form %}
+                    <div class="mb-3">
+                        <label class="form-label fw-bold small text-uppercase">{{ field.label }}</label>
+                        {{ field }}
+                        {% if field.errors %}
+                            <div class="text-danger small">{{ field.errors }}</div>
+                        {% endif %}
+                        {% if field.help_text %}
+                            <div class="text-muted style" style="font-size: 0.7rem;">{{ field.help_text }}</div>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+                <button type="submit" class="btn btn-success w-100 fw-bold py-2 mt-3">Registrar</button>
+            </form>
+            
+            <div class="mt-4 text-center">
+                <small class="text-muted">Já tem uma conta? <a href="{% url 'login' %}" class="text-success fw-bold">Entrar aqui</a></small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+
+    input[type="text"], input[type="password"] {
+        display: block;
+        width: 100%;
+        padding: 0.375rem 0.75rem;
+        font-size: 1rem;
+        line-height: 1.5;
+        color: #212529;
+        background-color: #fff;
+        border: 1px solid #ced4da;
+        border-radius: 0.375rem;
+    }
+</style>
+{% endblock %}

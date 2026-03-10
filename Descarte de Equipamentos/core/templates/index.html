@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Descarte Consciente - Araquari</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <style>
+        body {
+            background-color: #f4f7f6;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .sidebar {
+            width: 280px;
+            height: 100vh;
+            background-color: #2d5a27;
+            color: white;
+            position: fixed;
+            padding: 20px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column; 
+        }
+
+        .sidebar a {
+            color: rgba(255, 255, 255, 0.8);
+            text-decoration: none;
+            display: block;
+            padding: 12px;
+            border-radius: 8px;
+            transition: 0.3s;
+        }
+
+        .sidebar a:hover {
+            background-color: #3e7a36;
+            color: white;
+        }
+
+        .content {
+            margin-left: 280px;
+            padding: 40px;
+        }
+
+        #map {
+            height: 500px;
+            width: 100%;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+            background: #fff;
+        }
+
+        .btn-verde {
+            background-color: #2d5a27;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+        }
+
+        .btn-verde:hover {
+            background-color: #1e3d1a;
+            color: white;
+        }
+
+        .card {
+            border: none;
+            border-radius: 15px;
+            transition: transform 0.2s;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+        }
+    </style>
+</head>
+
+<body>
+    <div class="sidebar shadow">
+        <h3 class="mb-4 text-center fw-bold text-white">Descarte Web</h3>
+        
+        <nav class="flex-grow-1">
+            <a href="{% url 'dashboard' %}" class="mb-2">🏠 Pontos de Coleta</a>
+            <a href="{% url 'nova_solicitacao' %}" class="mb-2">♻️ Solicitar Coleta</a>
+            <a href="{% url 'lista_solicitacoes' %}" class="mb-2">📋 Ver Solicitações</a>
+            
+            <hr class="opacity-25">
+            
+            {% if user.is_superuser %}
+                <small class="text-white-50 px-3 text-uppercase fw-bold" style="font-size: 0.7rem;">Administração</small>
+                <a href="{% url 'lista_usuarios' %}" class="mb-2 text-warning">
+                    <i class="bi bi-people-fill me-2"></i> Gerir Usuários
+                </a>
+                <a href="/admin" target="_blank" class="mb-2">
+                    <i class="bi bi-shield-lock me-2"></i> Painel Admin
+                </a>
+            {% endif %}
+        </nav>
+
+        <div class="mt-auto border-top border-white border-opacity-25 pt-3">
+            {% if user.is_authenticated %}
+                <div class="px-2 mb-2 small" style="color: rgba(255,255,255,0.7);">
+                    <i class="bi bi-person-circle"></i> Logado como:<br>
+                    <strong class="text-white">{{ user.username }}</strong>
+                </div>
+                <form action="{% url 'logout' %}" method="post">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm btn-outline-light w-100">
+                        <i class="bi bi-box-arrow-right"></i> Sair
+                    </button>
+                </form>
+            {% else %}
+                <a href="{% url 'login' %}" class="btn btn-sm btn-success w-100 fw-bold">
+                    <i class="bi bi-box-arrow-in-right"></i> Entrar
+                </a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="content">
+        {% block main %}
+        <div class="container-fluid">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1 class="fw-bold text-dark">Ecopontos em Araquari</h1>
+                <span class="badge bg-white text-success shadow-sm p-2 px-3 border">Santa Catarina</span>
+            </div>
+
+            <div class="row mb-5">
+                <div class="col-12">
+                    <div id="map"></div>
+                </div>
+            </div>
+
+            <div class="row g-4">
+                <div class="col-md-4">
+                    <div class="card shadow-sm h-100">
+                        <div class="card-body">
+                            <h5 class="card-title fw-bold">Nova Solicitação</h5>
+                            <p class="card-text text-muted small">Agende a coleta de resíduos volumosos ou eletrônicos em sua residência.</p>
+                            <a href="{% url 'nova_solicitacao' %}" class="btn btn-verde">Abrir Formulário</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+            <!--Mapas interativos do https://leafletjs.com/, uma api gratuita usando java script para mapas interativos-->
+        <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+        <script>
+            const mapContainer = document.getElementById('map');
+            if (mapContainer) {
+                const map = L.map('map', {
+                    scrollWheelZoom: false,
+                    zoomControl: true
+                }).setView([-26.3725, -48.7210], 15);
+                //deixar o mapa mas cartunesco, evitando detalhes descessários
+                L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+                    attribution: '&copy; CartoDB',
+                    subdomains: 'abcd',
+                    maxZoom: 19
+                }).addTo(map);
+
+                try {
+                    const pontos = JSON.parse('{{ pontos_json|safe }}');
+                    if (pontos && pontos.length > 0) {
+                        pontos.forEach(ponto => {
+                            L.marker([ponto.lat, ponto.lng])
+                                .addTo(map)
+                                .bindPopup(`
+                                    <div style="font-family: sans-serif; min-width: 150px;">
+                                        <h6 style="margin:0; color:#2d5a27; font-weight: bold;">${ponto.nome}</h6>
+                                        <hr style="margin: 5px 0;">
+                                        <p style="margin:0; font-size:12px; color:#666;"><b>Resíduo:</b> ${ponto.info}</p>
+                                    </div>
+                                `);
+                        });
+                    }
+                } catch (e) {
+                    console.log("Aguardando dados do mapa...");
+                }
+            }
+        </script>
+        {% endblock %}
+    </div>
+    <!-- Bibliteca do bootstrap para interação e padronização facil de layout -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+
+</html>

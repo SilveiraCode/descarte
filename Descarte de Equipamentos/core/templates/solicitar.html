@@ -1,0 +1,126 @@
+{% extends 'index.html' %}
+
+{% block main %}
+<div class="container mt-4">
+    <div class="card shadow border-0" style="border-radius: 15px;">
+        <div class="card-header text-white py-3" style="background-color: #2d5a27; border-radius: 15px 15px 0 0;">
+            <h4 class="mb-0 text-center">♻️ Nova Solicitação de Coleta</h4>
+        </div>
+        <div class="card-body p-4">
+            <form method="POST" enctype="multipart/form-data">
+                {% csrf_token %}
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">O que vamos coletar?</label>
+                    {{ form.categoria }}
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Descrição</label>
+                    {{ form.descricao }}
+                </div>
+
+                <hr>
+
+                <div class="row">
+                    <div class="col-md-4 mb-3">
+                        <label class="form-label fw-bold">CEP (Araquari)</label>
+                        {{ form.cep }}
+                    </div>
+                    <div class="col-md-8 mb-3">
+                        <label class="form-label fw-bold">Bairro</label>
+                        {{ form.bairro }}
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-9 mb-3" style="position: relative;">
+                        <label class="form-label fw-bold">Rua</label>
+                        {{ form.rua }}
+                        <div id="lista-sugestoes" class="list-group" style="position: absolute; z-index: 1000; width: 95%;"></div>
+                    </div>
+                    <div class="col-md-3 mb-3">
+                        <label class="form-label fw-bold">Nº</label>
+                        {{ form.endereco_numero }}
+                    </div>
+                </div>
+
+                <div class="mb-4">
+                    <label class="form-label fw-bold">Anexar Foto</label>
+                    {{ form.foto }}
+                </div>
+
+                <div class="d-grid">
+                    <button type="submit" class="btn btn-success btn-lg fw-bold">FINALIZAR SOLICITAÇÃO</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    const campoRua = document.getElementById('id_rua');
+    const campoBairro = document.getElementById('id_bairro');
+    const listaSugestoes = document.getElementById('lista-sugestoes');
+
+    function buscarEnderecoPeloCEP(valor) {
+        var cep = valor.replace(/\D/g, '');
+    
+        //Tentar trazer as ruas de Araquari, porém deu errado devido a APIs não funcionarem corretamente com cidades pequenas
+        if (cep === "89245000") {
+
+            fetch('https://servicodados.ibge.gov.br/api/v1/localidades/municipios/4201302/distritos')
+                .then(res => res.json())
+                .then(bairros => {
+                    console.log("Bairros oficiais do IBGE carregados");
+  
+                    document.getElementById('id_bairro').placeholder = "Digite seu bairro (Ex: Itinga, Centro...)";
+                    document.getElementById('id_rua').focus();
+                });
+        } else if (cep.length === 8) {
+
+            //Buscar informações de endereço automaticamente com uma api pública chamada VIACEP
+            fetch(`https://viacep.com.br/ws/${cep}/json/`)
+                .then(res => res.json())
+                .then(dados => {
+                    if (!dados.erro) {
+                        document.getElementById('id_rua').value = dados.logradouro;
+                        document.getElementById('id_bairro').value = dados.bairro;
+                    }
+                });
+        }
+    }
+
+    campoRua.addEventListener('input', function() {
+        let busca = this.value;
+        if (busca.length < 3) { listaSugestoes.innerHTML = ''; return; }
+
+        //Segunda tentativa que deu falha ao trazer o endereço
+        fetch(`https://nominatim.openstreetmap.org/search?format=json&street=${busca}&city=Araquari&addressdetails=1&limit=5`)
+            .then(res => res.json())
+            .then(data => {
+                listaSugestoes.innerHTML = '';
+                data.forEach(item => {
+                    let logradouro = item.address.road || item.display_name.split(',')[0];
+                    let bairro = item.address.suburb || item.address.neighbourhood || "Araquari";
+                    
+                    let botao = document.createElement('button');
+                    botao.classList.add('list-group-item', 'list-group-item-action');
+                    botao.type = "button";
+                    botao.innerHTML = `<strong>${logradouro}</strong> <br><small>${bairro}</small>`;
+                    
+                    botao.onclick = function() {
+                        campoRua.value = logradouro;
+                        campoBairro.value = bairro;
+                        listaSugestoes.innerHTML = '';
+                    };
+                    listaSugestoes.appendChild(botao);
+                });
+            });
+    });
+
+    document.addEventListener('click', function(e) {
+        if (e.target !== campoRua) listaSugestoes.innerHTML = '';
+    });
+</script>
+{% endblock %}
